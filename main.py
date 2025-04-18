@@ -239,7 +239,8 @@ def extract_video_id(url):
     patterns = [
         r'/video/(\d+)',
         r'modal_id=(\d+)',
-        r'item_ids=(\d+)'
+        r'item_ids=(\d+)',
+        r'vid=(\d+)'  # 添加对海外访问链接格式的支持
     ]
     
     for pattern in patterns:
