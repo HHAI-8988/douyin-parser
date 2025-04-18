@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖音视频解析 - 管理设置</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #fe2c55;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .nav {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .nav a {
+            padding: 10px 15px;
+            text-decoration: none;
+            color: #666;
+            border-radius: 5px;
+            margin-right: 10px;
+            transition: all 0.3s;
+        }
+        
+        .nav a:hover {
+            background-color: #f9f9f9;
+            color: #fe2c55;
+        }
+        
+        .nav a.active {
+            background-color: #fe2c55;
+            color: white;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        
+        .section h2 {
+            margin-top: 0;
+            color: #444;
+            font-size: 1.3em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input[type="text"], 
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        input[type="text"]:focus, 
+        input[type="password"]:focus {
+            border-color: #fe2c55;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(254, 44, 85, 0.2);
+        }
+        
+        button {
+            background-color: #fe2c55;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #e6254e;
+        }
+        
+        .btn-secondary {
+            background-color: #666;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #555;
+        }
+        
+        .api-info {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .api-key {
+            font-family: monospace;
+            background-color: #eee;
+            padding: 8px 12px;
+            border-radius: 3px;
+            display: block;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        
+        .success-message {
+            background-color: #e6f7e6;
+            color: #2e7d32;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .copy-btn {
+            background-color: #666;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .copy-btn:hover {
+            background-color: #555;
+        }
+        
+        .flex {
+            display: flex;
+            align-items: center;
+        }
+        
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>抖音视频解析 - 管理设置</h1>
+        
+        <div class="nav">
+            <a href="/" class="active">首页</a>
+            <a href="/admin" class="active">管理设置</a>
+        </div>
+        
+        <div class="section">
+            <h2>API密钥设置</h2>
+            <div class="api-info">
+                <p>当前API密钥：</p>
+                <div class="flex">
+                    <code class="api-key" id="current-api-key">{{ api_key }}</code>
+                    <button class="copy-btn" onclick="copyToClipboard('current-api-key')">复制</button>
+                </div>
+                <p>说明：API密钥用于程序调用API接口时的身份验证，请妥善保管。</p>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button type="button" onclick="generateApiKey()">生成新密钥</button>
+                <div id="new-key-container" style="display: none; margin-top: 15px;">
+                    <p>新生成的API密钥：</p>
+                    <div class="flex">
+                        <code class="api-key" id="new-api-key"></code>
+                        <button class="copy-btn" onclick="copyToClipboard('new-api-key')">复制</button>
+                    </div>
+                    <p>注意：此密钥尚未保存，请点击下方的"保存设置"按钮使其生效。</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>安全设置</h2>
+            <form action="/admin/update" method="post">
+                <div class="form-group">
+                    <label for="access_password">访问密码：</label>
+                    <input type="password" id="access_password" name="access_password" value="{{ access_password }}" required>
+                    <small>用于登录网页界面和管理员面板的密码</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="api_key">API密钥：</label>
+                    <input type="text" id="api_key" name="api_key" value="{{ api_key }}" required>
+                    <small>用于API调用的密钥，可以手动输入或使用上方生成的密钥</small>
+                </div>
+                
+                <button type="submit">保存设置</button>
+            </form>
+        </div>
+        
+        <div class="section">
+            <h2>API使用说明</h2>
+            <p>调用示例：</p>
+            <pre style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;">
+curl -X GET "http://127.0.0.1:8000/parse-douyin?url=https://v.douyin.com/xxxxx/" -H "X-API-Key: {{ api_key }}"</pre>
+            <p>更多详细说明请查看 <a href="/API使用指南.md" target="_blank">API使用指南.md</a> 文档。</p>
+        </div>
+    </div>
+    
+    <script>
+        // 复制到剪贴板
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制到剪贴板');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+        
+        // 生成新的API密钥
+        function generateApiKey() {
+            fetch('/generate-api-key')
+                .then(response => response.json())
+                .then(data => {
+                    const newKeyContainer = document.getElementById('new-key-container');
+                    const newKeyElement = document.getElementById('new-api-key');
+                    const apiKeyInput = document.getElementById('api_key');
+                    
+                    newKeyElement.textContent = data.api_key;
+                    apiKeyInput.value = data.api_key;
+                    newKeyContainer.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('获取API密钥失败:', error);
+                    alert('获取API密钥失败，请重试');
+                });
+        }
+    </script>
+</body>
+</html>

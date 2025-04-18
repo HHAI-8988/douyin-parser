@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖音视频解析 - 登录</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+        
+        .login-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #fe2c55;
+            margin-bottom: 20px;
+        }
+        
+        .description {
+            margin-bottom: 25px;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        input[type="password"] {
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            outline: none;
+        }
+        
+        input[type="password"]:focus {
+            border-color: #fe2c55;
+            box-shadow: 0 0 0 2px rgba(254, 44, 85, 0.2);
+        }
+        
+        button {
+            background-color: #fe2c55;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #e6254e;
+        }
+        
+        .error-message {
+            color: #fe2c55;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .api-note {
+            margin-top: 25px;
+            font-size: 13px;
+            color: #888;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+        
+        .api-key {
+            background-color: #f8f8f8;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>抖音视频解析工具</h1>
+        <div class="description">
+            这是一个帮助你获取抖音视频无水印下载地址的工具。<br>
+            为了防止滥用，需要输入访问密码才能使用。
+        </div>
+        
+        <form action="/login" method="post">
+            {% if error %}
+            <div class="error-message">{{ error }}</div>
+            {% endif %}
+            
+            <input type="password" name="password" placeholder="请输入访问密码" required>
+            <button type="submit">登录</button>
+        </form>
+        
+        <div class="api-note">
+            <p>如果你需要通过API调用本服务，请在请求头中添加：</p>
+            <p class="api-key">X-API-Key: your_api_key_here</p>
+        </div>
+    </div>
+</body>
+</html>
