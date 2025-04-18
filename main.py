@@ -383,6 +383,16 @@ def parse_douyin_link(
                             video_url = item['video']['play_addr']['url_list'][0]
                             # 替换域名，获取无水印链接
                             video_url = video_url.replace('playwm', 'play')
+                            
+                            # 跟踪重定向获取真实的长链接
+                            try:
+                                redirect_resp = requests.get(video_url, headers=api_headers, timeout=15, allow_redirects=True)
+                                final_video_url = redirect_resp.url
+                                if final_video_url and final_video_url != video_url:
+                                    video_url = final_video_url
+                                    debug_info["video_url_redirected"] = True
+                            except Exception as redirect_err:
+                                debug_info["redirect_error"] = str(redirect_err)
                         
                         # 构建结果
                         if video_url and video_url != "未找到视频链接":
