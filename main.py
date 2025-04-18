@@ -596,3 +596,8 @@ async def startup_event():
     global CONFIG
     CONFIG = load_config()
     print("应用启动完成，配置已加载")
+
+# 添加一个简单的测试路由
+@app.get("/test")
+def test():
+    return {"message": "API is working!"}
