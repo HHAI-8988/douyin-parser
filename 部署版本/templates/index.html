@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖音视频解析工具</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #fe2c55;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .input-group input:focus {
+            border-color: #fe2c55;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(254, 44, 85, 0.2);
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background-color: #fe2c55;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            flex: 1;
+        }
+        
+        button:hover {
+            background-color: #e6254e;
+        }
+        
+        .btn-secondary {
+            background-color: #666;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #555;
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            display: none;
+        }
+        
+        .result h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .result-item {
+            margin-bottom: 15px;
+        }
+        
+        .result-item label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .result-item p {
+            margin: 0;
+            word-break: break-all;
+        }
+        
+        .result-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .debug-info {
+            margin-top: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            display: none;
+        }
+        
+        .debug-info h3 {
+            margin-top: 0;
+            color: #666;
+        }
+        
+        .debug-content {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover {
+            color: #fe2c55;
+        }
+        
+        .tab.active {
+            color: #fe2c55;
+            border-bottom-color: #fe2c55;
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        
+        .section h2 {
+            margin-top: 0;
+            color: #444;
+            font-size: 1.3em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .api-info {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .api-key {
+            font-family: monospace;
+            background-color: #eee;
+            padding: 8px 12px;
+            border-radius: 3px;
+            display: block;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        
+        .copy-btn {
+            background-color: #666;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .copy-btn:hover {
+            background-color: #555;
+        }
+        
+        .flex {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>抖音视频解析工具</h1>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('parse')">视频解析</div>
+            <div class="tab" onclick="switchTab('admin')">管理设置</div>
+        </div>
+        
+        <!-- 视频解析标签页 -->
+        <div id="parse-tab" class="tab-content active">
+            <div class="input-group">
+                <label for="douyin-url">请输入抖音视频链接：</label>
+                <input type="text" id="douyin-url" placeholder="例如：https://v.douyin.com/xxxxxx/ 或 https://www.douyin.com/video/xxxxxxxxx">
+            </div>
+            
+            <div class="btn-group">
+                <button onclick="parseDouyinVideo()">开始解析</button>
+                <button class="btn-secondary" onclick="clearInput()">清空输入</button>
+            </div>
+            
+            <div id="result" class="result">
+                <h2>解析结果</h2>
+                
+                <div class="result-item">
+                    <label>视频标题：</label>
+                    <p id="video-title"></p>
+                </div>
+                
+                <div class="result-item">
+                    <label>无水印视频地址：</label>
+                    <p id="video-url"></p>
+                </div>
+                
+                <div class="result-item">
+                    <label>封面图片：</label>
+                    <p id="cover-image"></p>
+                </div>
+                
+                <div class="result-actions">
+                    <button onclick="copyVideoUrl()">复制链接</button>
+                    <button onclick="openVideo()">播放视频</button>
+                    <button class="btn-secondary" onclick="toggleDebugInfo()">显示调试信息</button>
+                </div>
+            </div>
+            
+            <div id="debug-info" class="debug-info">
+                <h3>调试信息</h3>
+                <div class="debug-content" id="debug-content"></div>
+                <button onclick="copyDebugInfo()" style="margin-top: 10px;">复制调试信息</button>
+            </div>
+        </div>
+        
+        <!-- 管理设置标签页 -->
+        <div id="admin-tab" class="tab-content">
+            <div class="section">
+                <h2>API密钥设置</h2>
+                <div class="api-info">
+                    <p>当前API密钥：</p>
+                    <div class="flex">
+                        <code class="api-key" id="current-api-key">{{ api_key }}</code>
+                        <button class="copy-btn" onclick="copyToClipboard('current-api-key')">复制</button>
+                    </div>
+                    <p>说明：API密钥用于程序调用API接口时的身份验证，请妥善保管。</p>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button type="button" onclick="generateApiKey()">生成新密钥</button>
+                    <div id="new-key-container" style="display: none; margin-top: 15px;">
+                        <p>新生成的API密钥：</p>
+                        <div class="flex">
+                            <code class="api-key" id="new-api-key"></code>
+                            <button class="copy-btn" onclick="copyToClipboard('new-api-key')">复制</button>
+                        </div>
+                        <p>注意：此密钥尚未保存，请点击下方的"保存设置"按钮使其生效。</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>安全设置</h2>
+                <form action="/admin/update" method="post">
+                    <div class="form-group">
+                        <label for="access_password">访问密码：</label>
+                        <input type="password" id="access_password" name="access_password" value="{{ access_password }}" required>
+                        <small>用于登录网页界面和管理员面板的密码</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="api_key">API密钥：</label>
+                        <input type="text" id="api_key" name="api_key" value="{{ api_key }}" required>
+                        <small>用于API调用的密钥，可以手动输入或使用上方生成的密钥</small>
+                    </div>
+                    
+                    <button type="submit">保存设置</button>
+                </form>
+            </div>
+            
+            <div class="section">
+                <h2>API使用说明</h2>
+                <p>调用示例：</p>
+                <pre style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;">
+curl -X GET "http://127.0.0.1:8000/parse-douyin?url=https://v.douyin.com/xxxxx/" -H "X-API-Key: {{ api_key }}"</pre>
+                <p>更多详细说明请查看 <a href="/API使用指南.md" target="_blank">API使用指南.md</a> 文档。</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 切换标签页
+        function switchTab(tabName) {
+            // 隐藏所有标签页内容
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 取消所有标签的激活状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 激活选中的标签和内容
+            document.getElementById(tabName + '-tab').classList.add('active');
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+        }
+        
+        // 解析抖音视频
+        function parseDouyinVideo() {
+            const url = document.getElementById('douyin-url').value.trim();
+            
+            if (!url) {
+                alert('请输入抖音视频链接');
+                return;
+            }
+            
+            // 显示加载中
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('video-title').innerText = '解析中，请稍候...';
+            document.getElementById('video-url').innerText = '';
+            document.getElementById('cover-image').innerText = '';
+            document.getElementById('debug-info').style.display = 'none';
+            
+            // 发送请求
+            fetch(`/parse-douyin?url=${encodeURIComponent(url)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('video-title').innerText = data.data.title || '未找到标题';
+                        document.getElementById('video-url').innerText = data.data.video_url;
+                        document.getElementById('cover-image').innerText = data.data.cover_image;
+                        
+                        // 保存调试信息
+                        document.getElementById('debug-content').innerText = JSON.stringify(data.data.debug_info, null, 2);
+                    } else {
+                        document.getElementById('video-title').innerText = '解析失败';
+                        document.getElementById('video-url').innerText = data.msg || '未知错误';
+                        document.getElementById('cover-image').innerText = '无法获取';
+                        
+                        // 保存调试信息
+                        document.getElementById('debug-content').innerText = JSON.stringify(data, null, 2);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('video-title').innerText = '请求出错';
+                    document.getElementById('video-url').innerText = error.message;
+                    document.getElementById('cover-image').innerText = '无法获取';
+                    document.getElementById('debug-content').innerText = error.toString();
+                });
+        }
+        
+        // 清空输入
+        function clearInput() {
+            document.getElementById('douyin-url').value = '';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('debug-info').style.display = 'none';
+        }
+        
+        // 复制视频URL
+        function copyVideoUrl() {
+            const videoUrl = document.getElementById('video-url').innerText;
+            
+            if (!videoUrl) {
+                alert('没有可复制的视频链接');
+                return;
+            }
+            
+            navigator.clipboard.writeText(videoUrl).then(() => {
+                alert('视频链接已复制到剪贴板');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+        
+        // 打开视频
+        function openVideo() {
+            const videoUrl = document.getElementById('video-url').innerText;
+            
+            if (!videoUrl) {
+                alert('没有可播放的视频链接');
+                return;
+            }
+            
+            window.open(videoUrl, '_blank');
+        }
+        
+        // 显示/隐藏调试信息
+        function toggleDebugInfo() {
+            const debugInfo = document.getElementById('debug-info');
+            
+            if (debugInfo.style.display === 'none') {
+                debugInfo.style.display = 'block';
+            } else {
+                debugInfo.style.display = 'none';
+            }
+        }
+        
+        // 复制调试信息
+        function copyDebugInfo() {
+            const debugContent = document.getElementById('debug-content').innerText;
+            
+            navigator.clipboard.writeText(debugContent).then(() => {
+                alert('调试信息已复制到剪贴板');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+        
+        // 复制到剪贴板
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制到剪贴板');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+        
+        // 生成新的API密钥
+        function generateApiKey() {
+            fetch('/generate-api-key')
+                .then(response => response.json())
+                .then(data => {
+                    const newKeyContainer = document.getElementById('new-key-container');
+                    const newKeyElement = document.getElementById('new-api-key');
+                    const apiKeyInput = document.getElementById('api_key');
+                    
+                    newKeyElement.textContent = data.api_key;
+                    apiKeyInput.value = data.api_key;
+                    newKeyContainer.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('获取API密钥失败:', error);
+                    alert('获取API密钥失败，请重试');
+                });
+        }
+    </script>
+</body>
+</html>
