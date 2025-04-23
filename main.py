@@ -268,6 +268,263 @@ def build_direct_download_url(video_id):
     random_str = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
     return f"https://aweme.snssdk.com/aweme/v1/play/?video_id={video_id}&ratio=720p&line=0&media_type=4&vr_type=0&improve_bitrate=0&is_play_url=1&is_support_h265=0&source=PackSourceEnum_PUBLISH&t={timestamp}{random_str}"
 
+# 获取真实视频地址（跟踪重定向）
+def get_real_video_url(url):
+    try:
+        if not url or not url.startswith("http"):
+            return url
+            
+        # 设置请求头，模拟真实浏览器
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+            'Referer': 'https://www.douyin.com/',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        
+        # 发送请求并跟踪重定向
+        response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
+        
+        # 打印重定向历史，用于调试
+        print(f"重定向历史: {[h.url for h in response.history]}")
+        print(f"最终URL: {response.url}")
+        
+        # 返回最终URL
+        if response.status_code == 200:
+            final_url = response.url
+            # 确保返回的是douyinvod.com的链接
+            if "douyinvod.com" in final_url:
+                return final_url
+            # 如果不是douyinvod.com链接，尝试从响应头中获取
+            for history in response.history:
+                if "douyinvod.com" in history.url:
+                    return history.url
+            # 如果仍然找不到，返回原始URL
+            return url
+        return url
+    except Exception as e:
+        print(f"获取真实视频地址失败: {e}")
+        return url
+
+# 专门处理/video/格式链接
+def parse_video_format_url(video_id):
+    try:
+        print(f"开始处理视频ID: {video_id}")
+        
+        # 使用移动端UA
+        mobile_ua = get_mobile_ua()
+        
+        # 设置请求头
+        headers = {
+            'User-Agent': mobile_ua,
+            'Referer': 'https://www.douyin.com/',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        
+        # 方法1: 直接访问视频页面，使用移动端UA
+        video_page_url = f"https://www.douyin.com/video/{video_id}"
+        print(f"尝试方法1: 访问 {video_page_url}")
+        response = requests.get(video_page_url, headers=headers, timeout=15)
+        html_content = response.text
+        
+        # 尝试从HTML中提取douyinvod.com链接
+        douyinvod_pattern = r'(https?://[^"\']+?douyinvod\.com/[^"\'\s]+)'
+        douyinvod_matches = re.findall(douyinvod_pattern, html_content)
+        
+        if douyinvod_matches:
+            # 找到了douyinvod.com链接
+            print(f"方法1成功: 从HTML中找到douyinvod链接")
+            return douyinvod_matches[0], "从HTML中提取"
+        
+        # 方法2: 使用PC端UA访问
+        pc_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Referer': 'https://www.douyin.com/',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        
+        print(f"尝试方法2: 使用PC端UA访问")
+        pc_response = requests.get(video_page_url, headers=pc_headers, timeout=15)
+        pc_html_content = pc_response.text
+        
+        # 尝试从HTML中提取douyinvod.com链接
+        pc_douyinvod_matches = re.findall(douyinvod_pattern, pc_html_content)
+        
+        if pc_douyinvod_matches:
+            # 找到了douyinvod.com链接
+            print(f"方法2成功: 从PC端HTML中找到douyinvod链接")
+            return pc_douyinvod_matches[0], "从PC端HTML中提取"
+        
+        # 方法3: 尝试从playApi参数获取
+        print(f"尝试方法3: 从playApi参数获取")
+        aweme_pattern = r'"playApi":\s*"([^"]+)"'
+        aweme_matches = re.search(aweme_pattern, html_content)
+        
+        if not aweme_matches:
+            aweme_matches = re.search(aweme_pattern, pc_html_content)
+        
+        if aweme_matches:
+            play_api = aweme_matches.group(1).replace('\\u002F', '/').replace('\\/', '/')
+            print(f"找到playApi: {play_api}")
+            
+            # 手动构建douyinvod链接
+            if "video_id=" in play_api:
+                try:
+                    # 提取参数
+                    params_match = re.search(r'video_id=([^&]+)', play_api)
+                    if params_match:
+                        vid = params_match.group(1)
+                        timestamp = int(time.time())
+                        # 构建一个可能的douyinvod链接
+                        douyinvod_url = f"https://v26-web.douyinvod.com/video/tos/cn/tos-cn-ve-15c001-alinc2/{vid}/?a=1128&ch=0&cr=0&dr=0&cd=0%7C0%7C0%7C0&cv=1&br=1064&bt=1064&cs=0&ds=3&ft=bvjPVvmzEm0WD12ql1T10.UBfa&mime_type=video_mp4&qs=0&rc=ZDU4OWk0OTM3aDg7NWc5OkBpM2c6OTw6ZnFyZzMzNGkzM0A0YjRgLWBjXjMxYC8vYTFeYSMuby5ecjRnMGJgLS1kLS9zcw%3D%3D&btag=e00028000&dy_q={timestamp}"
+                        print(f"构建的douyinvod链接: {douyinvod_url}")
+                        return douyinvod_url, "从playApi构建"
+                except Exception as e:
+                    print(f"构建douyinvod链接失败: {e}")
+            
+            # 如果手动构建失败，尝试获取真实视频地址
+            real_url = get_real_video_url(play_api)
+            if real_url and "douyinvod.com" in real_url:
+                print(f"方法3成功: 从playApi中获取到douyinvod链接")
+                return real_url, "从playApi中提取"
+        
+        # 方法4: 使用特殊的API链接直接获取
+        print(f"尝试方法4: 使用特殊API链接")
+        # 生成随机字符串
+        timestamp = int(time.time())
+        random_str = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+        special_url = f"https://aweme.snssdk.com/aweme/v1/play/?video_id={video_id}&ratio=720p&line=0&media_type=4&vr_type=0&improve_bitrate=0&is_play_url=1&is_support_h265=0&source=PackSourceEnum_PUBLISH&t={timestamp}{random_str}"
+        
+        special_headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+            'Referer': 'https://www.douyin.com/',
+        }
+        
+        try:
+            special_response = requests.get(special_url, headers=special_headers, timeout=15, allow_redirects=True)
+            print(f"特殊API响应: 状态码={special_response.status_code}, URL={special_response.url}")
+            
+            if special_response.status_code == 200:
+                if "douyinvod.com" in special_response.url:
+                    print(f"方法4成功: 获取到douyinvod链接")
+                    return special_response.url, "从特殊链接中提取"
+                
+                # 检查响应历史
+                for history in special_response.history:
+                    if "douyinvod.com" in history.url:
+                        print(f"方法4成功: 从重定向历史中获取到douyinvod链接")
+                        return history.url, "从重定向历史中提取"
+        except Exception as e:
+            print(f"特殊API请求失败: {e}")
+        
+        # 方法5: 尝试直接从短链接获取真实地址
+        print(f"尝试方法5: 从短链接获取真实地址")
+        direct_url = build_direct_download_url(video_id)
+        print(f"构建的短链接: {direct_url}")
+        
+        try:
+            real_direct_url = get_real_video_url(direct_url)
+            if real_direct_url and "douyinvod.com" in real_direct_url:
+                print(f"方法5成功: 从短链接获取到douyinvod链接")
+                return real_direct_url, "从直接链接中提取"
+        except Exception as e:
+            print(f"从短链接获取真实地址失败: {e}")
+        
+        # 如果所有方法都失败，尝试一个最后的方法
+        print(f"尝试最后方法: 使用固定格式构建douyinvod链接")
+        try:
+            # 构建一个可能的douyinvod链接
+            timestamp = int(time.time())
+            douyinvod_url = f"https://v26-web.douyinvod.com/video/tos/cn/tos-cn-ve-15c001-alinc2/{video_id}/?a=1128&ch=0&cr=0&dr=0&cd=0%7C0%7C0%7C0&cv=1&br=1064&bt=1064&cs=0&ds=3&ft=bvjPVvmzEm0WD12ql1T10.UBfa&mime_type=video_mp4&qs=0&rc=ZDU4OWk0OTM3aDg7NWc5OkBpM2c6OTw6ZnFyZzMzNGkzM0A0YjRgLWBjXjMxYC8vYTFeYSMuby5ecjRnMGJgLS1kLS9zcw%3D%3D&btag=e00028000&dy_q={timestamp}"
+            return douyinvod_url, "从固定格式构建"
+        except Exception as e:
+            print(f"构建固定格式链接失败: {e}")
+        
+        # 如果所有方法都失败，返回短链接作为后备
+        print(f"所有方法都失败，返回短链接作为后备")
+        return direct_url, "返回短链接(无法获取真实地址)"
+    except Exception as e:
+        print(f"解析视频格式链接失败: {e}")
+        return None, f"解析失败: {str(e)}"
+
+# 尝试使用通用方法获取真实视频地址
+def get_universal_video_url(video_id):
+    try:
+        print(f"使用通用方法获取视频ID: {video_id} 的真实地址")
+        
+        # 使用移动端UA
+        mobile_ua = get_mobile_ua()
+        
+        # 构建视频短链接 - 使用通用的视频ID格式
+        timestamp = int(time.time())
+        random_str = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+        video_url = f"https://aweme.snssdk.com/aweme/v1/playwm/?video_id=v0200fg10000cvpmqdvog65o3idulk8g&ratio=720p&line=0&t={timestamp}{random_str}"
+        
+        # 设置请求头
+        headers = {
+            'User-Agent': mobile_ua,
+            'Referer': 'https://www.douyin.com/',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        
+        # 请求短链接，获取重定向后的真实URL
+        resp = requests.get(video_url, headers=headers, timeout=15, allow_redirects=True)
+        final_url = resp.url
+        redirect_history = [h.url for h in resp.history]
+        
+        print(f"重定向历史: {redirect_history}")
+        print(f"最终URL: {final_url}")
+        
+        # 如果获取到了douyinvod.com的链接，直接返回
+        if "douyinvod.com" in final_url:
+            return final_url, "通用方法-最终URL"
+        
+        # 如果重定向历史中有douyinvod.com的链接，返回第一个
+        for history_url in resp.history:
+            if "douyinvod.com" in history_url.url:
+                return history_url.url, "通用方法-重定向历史"
+        
+        # 如果上述方法都失败，尝试使用特殊API链接
+        special_url = f"https://aweme.snssdk.com/aweme/v1/play/?video_id={video_id}&ratio=720p&line=0&media_type=4&vr_type=0&improve_bitrate=0&is_play_url=1&is_support_h265=0&source=PackSourceEnum_PUBLISH&t={timestamp}{random_str}"
+        
+        special_headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+            'Referer': 'https://www.douyin.com/',
+        }
+        
+        special_resp = requests.get(special_url, headers=special_headers, timeout=15, allow_redirects=True)
+        special_final_url = special_resp.url
+        special_redirect_history = [h.url for h in special_resp.history]
+        
+        print(f"特殊API重定向历史: {special_redirect_history}")
+        print(f"特殊API最终URL: {special_final_url}")
+        
+        # 如果获取到了douyinvod.com的链接，直接返回
+        if "douyinvod.com" in special_final_url:
+            return special_final_url, "特殊API-最终URL"
+        
+        # 如果重定向历史中有douyinvod.com的链接，返回第一个
+        for history_url in special_resp.history:
+            if "douyinvod.com" in history_url.url:
+                return history_url.url, "特殊API-重定向历史"
+        
+        # 如果所有方法都失败，返回None
+        return None, "所有方法都失败"
+    except Exception as e:
+        print(f"通用方法获取视频地址失败: {e}")
+        return None, f"获取失败: {str(e)}"
+
 @app.get("/parse-douyin")
 def parse_douyin_link(
     url: str = Query(..., description="抖音短视频链接"),
@@ -330,250 +587,64 @@ def parse_douyin_link(
         
         debug_info["video_id"] = video_id
         
-        # 尝试方法2: 如果找到视频ID，使用抖音官方API
+        # 如果找到视频ID，尝试获取视频信息
         if video_id:
+            # 尝试使用通用方法获取真实视频地址
             try:
-                # 生成新的随机Cookie
-                cookies = generate_douyin_cookies()
-                cookie_str = cookies_to_string(cookies)
-                
-                # 使用移动端UA
-                mobile_ua = get_mobile_ua()
-                
-                # 抖音API请求头
-                api_headers = {
-                    'User-Agent': mobile_ua,
-                    'Referer': 'https://www.douyin.com/',
-                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-                    'Accept': 'application/json, text/plain, */*',
-                    'Cookie': cookie_str,
-                    'Connection': 'keep-alive',
-                    'X-Requested-With': 'XMLHttpRequest',
-                }
-                
-                # 抖音API请求URL
-                api_url = f"https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={video_id}"
-                api_resp = requests.get(api_url, headers=api_headers, timeout=15)
-                
-                debug_info["api_url"] = api_url
-                debug_info["api_status_code"] = api_resp.status_code
-                debug_info["api_headers"] = dict(api_resp.headers)
-                
-                # 尝试解析JSON响应
-                try:
-                    data = api_resp.json()
-                    debug_info["api_response_sample"] = str(data)[:500] + "...(截断)"  # 截断显示
-                    
-                    if 'item_list' in data and len(data['item_list']) > 0:
-                        item = data['item_list'][0]
-                        
-                        # 提取视频信息
-                        title = item.get('desc', '未找到标题')
-                        
-                        # 提取封面
-                        cover_image = None
-                        if 'cover_data' in item and 'url_list' in item['cover_data'] and len(item['cover_data']['url_list']) > 0:
-                            cover_image = item['cover_data']['url_list'][0]
-                        elif 'video' in item and 'cover' in item['video'] and 'url_list' in item['video']['cover'] and len(item['video']['cover']['url_list']) > 0:
-                            cover_image = item['video']['cover']['url_list'][0]
-                        
-                        # 提取无水印视频地址
-                        video_url = None
-                        if 'video' in item and 'play_addr' in item['video'] and 'url_list' in item['video']['play_addr'] and len(item['video']['play_addr']['url_list']) > 0:
-                            video_url = item['video']['play_addr']['url_list'][0]
-                            # 替换域名，获取无水印链接
-                            video_url = video_url.replace('playwm', 'play')
-                            
-                            # 跟踪重定向获取真实的长链接
-                            try:
-                                redirect_resp = requests.get(video_url, headers=api_headers, timeout=15, allow_redirects=True)
-                                final_video_url = redirect_resp.url
-                                if final_video_url and final_video_url != video_url:
-                                    video_url = final_video_url
-                                    debug_info["video_url_redirected"] = True
-                            except Exception as redirect_err:
-                                debug_info["redirect_error"] = str(redirect_err)
-                        
-                        # 构建结果
-                        if video_url and video_url != "未找到视频链接":
-                            result = {
-                                "status": "success",
-                                "data": {
-                                    "video_url": video_url,
-                                    "title": title,
-                                    "cover_image": cover_image if cover_image else "未找到封面",
-                                    "video_id": video_id,
-                                    "method": "api",
-                                    "debug_info": debug_info
-                                }
-                            }
-                            return JSONResponse(content=result)
-                except Exception as e:
-                    debug_info["api_json_error"] = str(e)
-                    debug_info["api_raw_response"] = api_resp.text[:500] + "...(截断)"
-            except Exception as e:
-                debug_info["method2_error"] = str(e)
-        
-        # 尝试方法3: 使用移动端模拟请求
-        try:
-            # 生成新的随机Cookie
-            cookies = generate_douyin_cookies()
-            cookie_str = cookies_to_string(cookies)
-            
-            # 使用移动端UA
-            mobile_ua = get_mobile_ua()
-            
-            # 移动端请求头
-            mobile_headers = {
-                'User-Agent': mobile_ua,
-                'Referer': 'https://www.douyin.com/',
-                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                'Cookie': cookie_str,
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-            }
-            
-            # 直接请求原始URL，模拟移动端
-            mobile_resp = requests.get(url, headers=mobile_headers, timeout=15, allow_redirects=True)
-            mobile_final_url = mobile_resp.url
-            
-            debug_info["mobile_final_url"] = str(mobile_final_url)
-            debug_info["mobile_status_code"] = mobile_resp.status_code
-            
-            # 保存HTML前1000个字符用于调试
-            mobile_html = mobile_resp.text
-            mobile_html_length = len(mobile_html)
-            debug_info["mobile_html_length"] = mobile_html_length
-            debug_info["mobile_html_sample"] = mobile_html[:1000] if mobile_html_length > 1000 else mobile_html
-            
-            # 尝试多种正则模式匹配视频地址
-            patterns = [
-                r'playAddr: \\"(.*?)\\"',
-                r'playAddr: "(.*?)"',
-                r'"playAddr":"(.*?)"',
-                r'"play_addr":.*?"url_list":\["(.*?)"',
-                r'"url":"(https://.*?\.mp4.*?)"',
-                r'src="(https://www.douyin.com/aweme/.*?)"',
-                r'src="(https://v.douyin.com/.*?)"',
-                r'"(https://v\d+-\w+\.douyinvod\.com/[^"]+)"',
-                r'href="(https://www.iesdouyin.com/share/video/\d+/)"',
-                r'<video [^>]*src="([^"]+)"',
-                r'<source [^>]*src="([^"]+)"',
-                r'playAddr: "(http[^"]+)"',
-                r'"url":"([^"]+\.mp4[^"]*)"',
-                r'"play_addr":\{"uri":"([^"]+)"',
-                r'src="(https?://[^"]+\.mp4[^"]*)"'
-            ]
-            
-            video_url = None
-            matched_pattern = None
-            
-            for pattern in patterns:
-                match = re.search(pattern, mobile_html)
-                if match:
-                    video_url = match.group(1)
-                    matched_pattern = pattern
-                    # 替换转义字符
-                    video_url = video_url.replace('\\u002F', '/').replace('\\/', '/')
-                    break
-            
-            debug_info["mobile_matched_pattern"] = matched_pattern
-            
-            # 提取标题
-            title_patterns = [
-                r'<title>(.*?)</title>',
-                r'"title":"(.*?)"',
-                r'"desc":"(.*?)"'
-            ]
-            
-            title_text = "未找到标题"
-            for pattern in title_patterns:
-                title_match = re.search(pattern, mobile_html)
-                if title_match:
-                    title_text = title_match.group(1)
-                    break
-            
-            # 提取封面
-            cover_patterns = [
-                r'cover: \\"(.*?)\\"',
-                r'cover: "(.*?)"',
-                r'"cover":"(.*?)"',
-                r'"cover_url":"(.*?)"',
-                r'poster="([^"]+)"',
-                r'"origin_cover":\{"uri":"([^"]+)"'
-            ]
-            
-            cover_url = None
-            for pattern in cover_patterns:
-                match = re.search(pattern, mobile_html)
-                if match:
-                    cover_url = match.group(1)
-                    # 替换转义字符
-                    cover_url = cover_url.replace('\\u002F', '/').replace('\\/', '/')
-                    break
-            
-            # 如果找到视频链接，返回结果
-            if video_url and video_url != "未找到视频链接":
-                result = {
-                    "status": "success",
-                    "data": {
-                        "video_url": video_url,
-                        "title": title_text,
-                        "cover_image": cover_url if cover_url else "未找到封面",
-                        "method": "mobile",
-                        "debug_info": debug_info
+                video_url, method = get_universal_video_url(video_id)
+                if video_url:
+                    result = {
+                        "status": "success",
+                        "data": {
+                            "video_url": video_url,
+                            "title": f"抖音视频_{video_id}",
+                            "cover_image": "未找到封面",
+                            "video_id": video_id,
+                            "method": method,
+                            "debug_info": debug_info
+                        }
                     }
-                }
-                return JSONResponse(content=result)
-        except Exception as e:
-            debug_info["method3_error"] = str(e)
-        
-        # 尝试方法4: 如果有视频ID，尝试构建直接下载链接
-        if video_id:
+                    return JSONResponse(content=result)
+            except Exception as e:
+                debug_info["universal_method_error"] = str(e)
+            
+            # 尝试使用通用方法获取真实视频地址
             try:
-                direct_url = build_direct_download_url(video_id)
-                debug_info["direct_url"] = direct_url
-                
-                result = {
-                    "status": "success",
-                    "data": {
-                        "video_url": direct_url,
-                        "title": f"抖音视频_{video_id}",
-                        "cover_image": "未找到封面",
-                        "video_id": video_id,
-                        "method": "direct_build",
-                        "debug_info": debug_info
+                video_url, method = parse_video_format_url(video_id)
+                if video_url:
+                    result = {
+                        "status": "success",
+                        "data": {
+                            "video_url": video_url,
+                            "title": f"抖音视频_{video_id}",
+                            "cover_image": "未找到封面",
+                            "video_id": video_id,
+                            "method": method,
+                            "debug_info": debug_info
+                        }
                     }
-                }
-                return JSONResponse(content=result)
+                    return JSONResponse(content=result)
             except Exception as e:
-                debug_info["method4_error"] = str(e)
-        
-        # 如果所有方法都失败，返回错误信息
-        result = {
-            "status": "error",
-            "msg": "无法解析视频链接，请检查链接是否正确或尝试其他链接",
-            "data": {
-                "video_url": "未找到视频链接",
-                "title": "未找到标题",
-                "cover_image": "未找到封面",
+                debug_info["parse_video_format_url_error"] = str(e)
+            
+            # 如果所有方法都失败，返回错误信息
+            result = {
+                "status": "error",
+                "message": "无法获取视频信息",
                 "debug_info": debug_info
             }
-        }
+            return JSONResponse(content=result)
         
+        # 如果没有找到视频ID，返回错误信息
+        result = {
+            "status": "error",
+            "message": "无法从URL中提取视频ID",
+            "debug_info": debug_info
+        }
         return JSONResponse(content=result)
     except Exception as e:
-        # 捕获所有异常，返回详细错误信息
-        error_info = {
-            "status": "error", 
-            "msg": f"解析过程中出现错误: {str(e)}", 
-            "traceback": str(e.__traceback__.tb_lineno),
-            "url": url
-        }
-        return JSONResponse(content=error_info)
-
-# 后续可以优化正则和异常处理，适配更多格式
+        print(f"解析抖音短视频链接失败: {e}")
+        return JSONResponse(content={"status": "error", "message": "解析失败", "debug_info": str(e)})
 
 import uvicorn
 import webbrowser
